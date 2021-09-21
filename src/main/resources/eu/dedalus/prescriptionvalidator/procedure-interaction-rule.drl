@@ -1,0 +1,115 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+// verifica che la lista degli accertamenti gia' mutualmente esclusivi con p NON siano prescritti
+//Mando solo un warning, poi in fase di fascicolazione ricontrollo ed eventualmente creo ricette separate
+rule "check needToExclude"
+dialect "java"
+    when
+        //sia p un accertamento che ha una lista di procedure needToExclude non vuota
+        $p : Procedure( $pid : id, needToExclude != null && needToExclude.size() > 0)    
+		
+		// sia lst la lista (NON VUOTA) di tutti i ProcedureInteraction di p il cui codice catalogo e' in memoria
+		$lst: List(size > 0) from accumulate (
+                $itemn: ProcedureInteraction() from $p.needToExclude and Procedure(id != $pid, catalogueCode == $itemn.code);
+                collectList($itemn)
+         	)    
+    then
+    	boolean ignore = !$p.getCheckFlags().containsKey("needToExcludeWarning") ? false : $p.getCheckFlags().get("needToExcludeWarning");
+        Notification n = new Notification("P11","validator.procedure.needToExclude");
+        n.setChoiceType("ALL");
+        
+        for( int i = 0; i < $lst.size(); i++) {	   
+			ProcedureInteraction pi = (ProcedureInteraction)$lst.get(i);
+			 n.addChoice(pi.getCode(), pi.getDescription());
+          	 LOGGER.info( "{} Found code to exclude {} {}", $p.getDescription(), pi.getCode(), pi.getDescription() ); 
+        }
+           
+    	if(ignore) {
+    		$p.getInformations().add(n);
+    	} else {
+    		$p.getWarnings().add(n);
+    	}
+end
+
+// verifica che la lista degli accertamenti gia' 'coperti' da p NON siano prescritti
+rule "check alreadyInclude"
+dialect "java"
+    when
+        //sia p un accertamento che ha una lista di procedure alreadyInclude non vuota
+        $p : Procedure( $pid : id, alreadyInclude != null && alreadyInclude.size() > 0)    
+		
+		// sia lst la lista (NON VUOTA) di tutti i ProcedureInteraction di p il cui codice catalogo e' in memoria
+		$lst: List(size > 0) from accumulate (
+                $itemn: ProcedureInteraction() from $p.alreadyInclude and Procedure(id != $pid, catalogueCode == $itemn.code);
+                collectList($itemn)
+         	)    
+    then
+    	boolean ignore = !$p.getCheckFlags().containsKey("alreadyIncludeWarning") ? false : $p.getCheckFlags().get("alreadyIncludeWarning");
+        Notification n = new Notification("P10","validator.procedure.alreadyInclude");
+        n.setChoiceType("ALL");
+        
+        for( int i = 0; i < $lst.size(); i++) {	   
+			ProcedureInteraction pi = (ProcedureInteraction)$lst.get(i);
+			 n.addChoice(pi.getCode(), pi.getDescription());
+          	 LOGGER.info( "{} Found code to already include {} {}", $p.getDescription(), pi.getCode(), pi.getDescription() ); 
+        }
+           
+    	if(ignore) {
+    		$p.getInformations().add(n);
+    	} else {
+    		$p.getWarnings().add(n);
+    	}
+end
+
+// verifica che la lista degli accertamenti obbligatori collegati a p siano prescritti
+rule "check needToInclude"
+dialect "java"
+when
+	 //sia p un accertamento che ha una lista di procedure needToInclude non vuota
+     $p : Procedure( $pid : id, needToInclude != null && needToInclude.size() > 0)
+     
+     // sia lst la lista (NON VUOTA) di tutti i ProcedureInteraction di p il cui codice catalogo NON e' in memoria
+	 $lst: List(size > 0) from accumulate (
+            $itemn: ProcedureInteraction() from $p.needToInclude and not Procedure(id != $pid, catalogueCode == $itemn.code);
+            collectList($itemn)
+     )
+then
+ 	 Notification n = new Notification("P12","validator.procedure.needToInclude");
+     n.setChoiceType("ALL");
+        
+     for( int i = 0; i < $lst.size(); i++) {	   
+		ProcedureInteraction pi = (ProcedureInteraction)$lst.get(i);
+		 n.addChoice(pi.getCode(), pi.getDescription());
+      	 LOGGER.info( "{} Found code to needToInclude {} {}", $p.getDescription(), pi.getCode(), pi.getDescription()); 
+     }
+     $p.getErrors().add(n); 	
+end
+
+rule "needToInclude only one"
+dialect "java"
+no-loop
+when
+    //sia p un accertamento che ha una lista di procedure needToInclude non vuota
+    $p : Procedure( $pid : id, include: needToInclude, needToInclude != null && needToInclude.size() > 0)
+     
+     //sia p1 un accertamento che ha una lista di procedure needToInclude non vuota
+    $p1 : Procedure(id != $pid, include2: needToInclude, needToInclude != null && needToInclude.size() > 0)
+    
+    $lst: List(size > 0) from accumulate (
+            $itemn: ProcedureInteraction() from include and ProcedureInteraction(code matches $itemn.code) from include2;
+            collectList($itemn)
+     )
+then
+    java.util.Optional<Notification> opt = $p.getErrors().stream().filter(x-> "ONLYONE".equals(x.getCode())).findFirst();
+    if(!opt.isPresent()){
+        Notification n = new Notification("ONLYONE","validator.procedure.onlyone");
+        n.setChoiceType("SINGLE");
+        n.addChoice($p.getCatalogueCode(), $p.getDescription());
+        n.addChoice($p1.getCatalogueCode(), $p1.getDescription());
+        LOGGER.info("{} Found ONLYONE {} {} ",$lst.size(), $p.getCatalogueCode(), $p1.getCatalogueCode());
+        $p.getErrors().add(n); 
+    } else {
+        opt.get().addChoice($p1.getCatalogueCode(), $p1.getDescription());
+    }
+end

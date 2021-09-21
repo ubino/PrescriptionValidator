@@ -1,0 +1,51 @@
+package eu.dedalus.prescriptionvalidator;
+
+rule "150-Brevet"
+dialect "java"
+enabled true
+when
+    $validator : Validator(region == "150")
+    $d :Drug(type == 'F', (atc != null && (atc.startsWith("C09C") || atc.startsWith("C09D"))),
+        (drugFlags["IS_GENERIC"] != null && drugFlags["IS_GENERIC"] == true) ||
+        (drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true),
+        $brevetReason : brevetReason
+        )
+
+then
+
+    if(LOGGER != null)
+        LOGGER.info("the drug is covered by brevet ");
+    
+    Notification brevet = new Notification("BREVET", null);
+    brevet.addChoice("AA000001","Documentata intolleranza ai farmaci di cui è scaduta la copertura brevettuale appartenenti alla stessa categoria terapeutica omogenea");
+    brevet.addChoice("AA000002","Documentata non risposta/inefficacia ai farmaci di cui è scaduta la copertura brevettuale appartenenti alla stessa categoria terapeutica omogenea");
+    brevet.addChoice("AA000003","Particolari esigenze terapeutiche per pazienti a rischio (ipertesi con diabete tipo 2 con microalbuminuria, riduzione progressione malattia renale, malattia carrdiovascolare aterotrombotica, danno d'organo, insuff. cardiaca e pregresso IMA)");
+    brevet.addChoice("AA000004","Pazienti a rischio in prosecuzione di terapia che presentano le condizioni di soggetti a rischio come indicate nel codice AA000003");
+    brevet.addChoice("AA000005","Indicazioni registrate differenti tra farmaco a brevetto scaduto e specialità medicinale");
+    brevet.addChoice("-1","(indicare il codice del medico induttore) Prosecuzione terapia da dimissione ospedaliera e/o Specialistica Ambulatoriale che rientrano nelle condizioni di utilizzo in esigenze di documentato rischio cardiovascolare come indicate ne codice AA000003");
+    brevet.addChoice("-2","Nessuno dei casi precedenti");
+    brevet.setChoiceType("SINGLE");
+    
+    if($brevetReason == null || $brevetReason.isEmpty()){
+        //need to add reason
+        brevet.setMessage("validator.drug.brevetReason");
+        $d.getErrors().add(brevet);
+    } else {
+        // can change reason
+        brevet.setMessage("validator.drug.alreadybrevetReason");
+        if(LOGGER != null)
+            LOGGER.info("The brevet reason is already specified ");
+        if($brevetReason.equals("-1") 
+            && ($d.getInductor() == null || $d.getInductor().isEmpty()) //inductor code is not specified
+            && ($d.getCheckFlags() == null || $d.getCheckFlags().get("inductor") == false )// the inductor flag is disabled
+            ){
+            if(LOGGER != null)
+                LOGGER.info("validator.drug.brevetInductor");
+            // indicare il codice del medico induttore
+            $d.addCheckFlags("inductor", new Boolean(true));
+            // should be re-evaluated the drug
+            update( $d )
+        }
+        $d.getInformations().add(brevet);
+    }
+end

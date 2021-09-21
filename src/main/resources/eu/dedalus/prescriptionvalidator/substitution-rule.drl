@@ -1,0 +1,266 @@
+package eu.dedalus.prescriptionvalidator;
+
+rule "150-Substitution"
+dialect "java"
+when
+     $validator : Validator(region == "150" || region == "190")
+     $d :Drug(type == 'F', replaceable == false, $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason ");
+    
+    Notification sub = new Notification("SUB", null);
+    sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+    sub.addChoice("2","Obiettive difficoltà di assunzione");
+    sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+    sub.addChoice("4","Nota art.15, comma 11-bis (Linee guida TS 25/2013)");
+    sub.setChoiceType("SINGLE");
+    if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+        sub.setMessage("validator.drug.missingSubReason");
+        $d.setReplaceableReason("4");
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason
+        sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }
+end
+
+
+
+rule "130-Substitution"
+enabled false
+//FIXME: va fatta dopo la 130-DPC Eparine Rule??
+dialect "java"
+when
+     $validator : Validator($region: region == "130")
+     $d :Drug(type == 'F', replaceable == false,!(drugFlags["IS_WITHBREVET"] != null && drugFlags["IS_WITHBREVET"] == true && drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true),
+              $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason " +$region);
+    Notification sub = new Notification("SUB", null);
+    String defaultChoice="4";
+    boolean dpc = false;
+    if($d.getDrugFlags() != null && $d.getDrugFlags().containsKey("DPC"))
+        {  dpc = $d.getDrugFlags().get("DPC");}
+    
+    LOGGER.info("dpc 130"+dpc );    
+    if (dpc  // &&($d.getAtc().startsWith("B01AB")) && 
+     	       ){
+      			 defaultChoice="1";
+       			 sub.addChoice("1","A-Ipersensibilità, intolleranza, interazione o controindicazione ad eccipienti – DPC");
+   				 sub.addChoice("2","B-Obiettive difficoltà di assunzione – DPC");
+   				 sub.addChoice("3","C-Terapia complessa/Problematiche assistenziali – DPC");
+  				 sub.addChoice("4","D-Continuità terapeutica (soltanto nel caso di farmaci biologici) – DPC");
+  				 sub.addChoice("5","E-Continuità terapeutica (prodotti a base di tacrolimus in formulazione orale) – DPC");
+  				 sub.addChoice("6","Non art.15, comma 11-bis (Linee guida TS 25/2/2013) – DPC");  			
+   				 sub.setChoiceType("SINGLE");
+   				 
+   				 }
+    else {
+       			 sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+   				 sub.setChoiceType("SINGLE");
+      			}  
+      
+     if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+      
+        sub.setMessage("validator.drug.missingSubReason");
+        $d.setReplaceableReason(defaultChoice);
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason 
+        sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }  
+end
+
+
+rule "080-Substitution"
+enabled false
+dialect "java"
+when
+     $validator : Validator($region: region == "080")
+     $d :Drug(type == 'F',  replaceable == false,!(drugFlags["IS_WITHBREVET"] != null && drugFlags["IS_WITHBREVET"] == true && drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true) 
+        , $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason "+$region );
+    Notification sub = new Notification("SUB", null);
+    String defaultChoice="4";
+    boolean dpc = false;
+   
+    if($d.getDrugFlags() != null && $d.getDrugFlags().containsKey("DPC"))
+        {  dpc = $d.getDrugFlags().get("DPC");}
+    
+    LOGGER.info("dpc "+dpc );    
+    if (dpc)
+          { 
+   				 sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+  				 sub.addChoice("4.1","Sic volo per continuità terapeutica");
+   				 sub.setChoiceType("SINGLE");
+   		  }   
+      else{
+             	 sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+   				 sub.setChoiceType("SINGLE");
+           }    
+        
+        
+     if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+        sub.setMessage("validator.drug.missingSubReason");
+        $d.setReplaceableReason(defaultChoice);
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason 
+        sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }  
+end
+
+
+rule "010-Substitution"
+enabled false
+dialect "java"
+when
+     $validator : Validator(region =="010", $region:region)
+     $d :Drug(type == 'F',  replaceable == false,!((drugFlags["IS_WITHBREVET"] != null && drugFlags["IS_WITHBREVET"] == true) && drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true) ||
+        (drugFlags["DPC"] != null && drugFlags["DPC"] == true)
+        , $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason "+$region );
+    Notification sub = new Notification("SUB", null);
+    String defaultChoice="4";
+    boolean dpc = false;
+   
+    if($d.getDrugFlags() != null && $d.getDrugFlags().containsKey("DPC"))
+        {  dpc = $d.getDrugFlags().get("DPC");}
+    
+        LOGGER.info("dpc "+dpc );         
+       if (dpc)
+          { 
+   		         sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+  				 sub.addChoice("5","Sic volo per gravi esigenze cliniche");
+  				 sub.addChoice("6", "Non sostituibile");
+   				 sub.setChoiceType("SINGLE");
+   		   
+          
+          }   
+       else{
+             	 sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+   				 sub.setChoiceType("SINGLE");
+           }    
+     if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+        sub.setMessage("validator.drug.missingSubReason");
+        $d.setReplaceableReason(defaultChoice);
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason 
+         sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }  
+end
+
+rule "170-Substitution"
+enabled false
+dialect "java"
+when
+     $validator : Validator(region == "170", $region:region)
+     $d :Drug(type == 'F',  replaceable == false,!((drugFlags["IS_WITHBREVET"] != null && drugFlags["IS_WITHBREVET"] == true) && drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true) ||
+        (drugFlags["DPC"] != null && drugFlags["DPC"] == true)
+        , $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason "+$region );
+    Notification sub = new Notification("SUB", null);
+    String defaultChoice="4";
+    boolean missingSubReasonBio = false;
+    boolean dpc = false;
+   
+    if($d.getDrugFlags() != null && $d.getDrugFlags().containsKey("DPC"))
+        {  dpc = $d.getDrugFlags().get("DPC");}
+    
+    LOGGER.info("dpc "+dpc );        
+    if (dpc)
+          { 	 //In caso di farmaco biologico inserire giustificazione per non sostituibile
+   		         missingSubReasonBio=true;
+   		         defaultChoice="1";
+   				 sub.addChoice("1" , "Documentata inefficacia terapeutica del biosimilare");
+   				 sub.addChoice("2", "Manifesta intolleranza al biosimilare" );
+   				 sub.addChoice("3", "Continuità terapeutica");
+   				 sub.setChoiceType("SINGLE");
+   		    
+          }   
+       else{
+             	 sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+   				 sub.addChoice("2","Obiettive difficoltà di assunzione");
+   				 sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  				 sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+   				 sub.setChoiceType("SINGLE");
+           }          
+      
+      
+     if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+        if (missingSubReasonBio)
+           {sub.setMessage("validator.drug.missingSubReasonBio");}
+        else
+         {sub.setMessage("validator.drug.missingSubReason");}
+        $d.setReplaceableReason(defaultChoice);
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason 
+         sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }  
+end
+
+rule "Substitution"
+enabled false
+dialect "java"
+when
+     $validator : Validator(region != "150" && region != "130" && region != "080" && region != "010" && region != "170", $region:region)
+     $d :Drug(type == 'F',  replaceable == false, drugFlags["IS_WITHBREVET"] != null && drugFlags["IS_WITHBREVET"] == true && drugFlags["NONE_REF_PRICE"] != null && drugFlags["NONE_REF_PRICE"] == true
+        , $replaceableReason : replaceableReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug is replaceable and must to specify the reason "+$region );
+    Notification sub = new Notification("SUB", null);
+    String defaultChoice="4";
+   
+    sub.addChoice("1","Ipersensibilità, intolleranza o controindicazione ad eccipienti");
+    sub.addChoice("2","Obiettive difficoltà di assunzione");
+    sub.addChoice("3","Terapia complessa/Problematiche assistenziali");
+  	sub.addChoice("4","Non art.15, comma 11-bis (Linee guida TS 25/2013)");
+   	sub.setChoiceType("SINGLE");
+      
+     if($replaceableReason == null || $replaceableReason == ""){
+        //need to add reason
+        sub.setMessage("validator.drug.missingSubReason");
+        $d.setReplaceableReason(defaultChoice);
+        $d.getErrors().add(sub);
+    } else {
+        // can change reason 
+        sub.setMessage("validator.drug.alreadySubReason");
+        $d.getInformations().add(sub);
+    }  
+end

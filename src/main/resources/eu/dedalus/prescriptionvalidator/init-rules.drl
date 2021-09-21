@@ -1,0 +1,106 @@
+package eu.dedalus.prescriptionvalidator;
+
+import eu.dedalus.prescriptionmodel.BaseDrug;
+import eu.dedalus.prescriptionmodel.ContinuousTherapy;
+import eu.dedalus.prescriptionmodel.Drug;
+import eu.dedalus.prescriptionmodel.Procedure;
+import eu.dedalus.prescriptionmodel.DrugIntolerance;
+import eu.dedalus.prescriptionmodel.Exemption;
+import eu.dedalus.prescriptionmodel.Interaction;
+import eu.dedalus.prescriptionmodel.Notification;
+import eu.dedalus.prescriptionmodel.Validator;
+import eu.dedalus.prescriptionmodel.Diagnosis;
+import eu.dedalus.prescriptionmodel.ExemptionItem;
+import eu.dedalus.prescriptionmodel.ProcedureInteraction;
+import eu.dedalus.prescriptionmodel.CarePlan;
+
+import eu.dedalus.prescriptionmodel.LoggerUtility;
+import java.util.List;
+import java.util.ArrayList;
+import org.slf4j.Logger;
+import java.util.Date;
+import function eu.dedalus.prescriptionmodel.LoggerUtility.initLog;
+import java.util.Arrays;
+
+global Logger LOGGER;
+global Date TODAY;
+
+rule "init"
+dialect "java"
+salience 300
+no-loop true
+when
+    //Without LHS: this rule is fired only once time
+then
+    //Init logger in stance from static function
+    drools.getWorkingMemory().setGlobal("LOGGER", initLog());
+    // init today variable
+    drools.getWorkingMemory().setGlobal("TODAY",  new Date());
+end
+
+rule "Physician Drug/Exemption association"
+dialect "java"
+salience 99
+enabled false
+no-loop true
+when
+    $d : Drug(exemption != null, exemption.weight < 100, $code : exemption.code)
+    $e : Exemption(code == $code)
+then
+    Exemption s = $e.clone();
+    s.setWeight(100);
+    $d.setExemption(s);
+    if(LOGGER != null)
+        LOGGER.info( "Confirm Drug-Exemption association, {}", s);
+   //$d.getExemption().setWeight(100);
+  
+end
+
+rule "Physician Procedure/Exemption association"
+dialect "java"
+enabled false
+salience 99
+no-loop true
+when
+    $p : Procedure(exemption != null, exemption.weight < 100, $code : exemption.code)
+    $e : Exemption(code == $code)
+then
+    Exemption s = $e.clone();
+    s.setWeight(100);
+    $p.setExemption(s);
+    if(LOGGER != null)
+        LOGGER.info( "Confirm Procedure-Exemption association");
+    //$p.getExemption().setWeight(100);
+end
+
+
+
+rule "Physician Exemption association"
+dialect "java"
+salience 99
+no-loop true
+when
+    $p : CommonDataInterface(type != 'admission' && exemption != null, exemption.weight < 100, $code : exemption.code)
+    $e : Exemption(code == $code)
+then
+    Exemption s = $e.clone();
+    s.setWeight(100);
+    $p.setExemption(s);
+ if(LOGGER != null)
+   LOGGER.info( "Confirm Physician Exemption association");
+end
+
+
+
+rule "Naz-No MEF credentials"
+dialect "java"
+no-loop true
+when
+    $validator : Validator(!haveCredentials)
+    $c : CommonDataInterface (type != 'admission' )
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("Naz-No MEF credentials {}", $c);
+    $c.setDemat(false);
+end

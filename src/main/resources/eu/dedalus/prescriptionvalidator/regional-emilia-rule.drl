@@ -1,0 +1,151 @@
+package eu.dedalus.prescriptionvalidator;
+global List<String> diabeticDrugs;
+
+rule "080-initListsRule"
+no-loop true
+salience 99
+when
+    $validator : Validator(region == "080")
+then
+    if(diabeticDrugs == null || diabeticDrugs.size() == 0){
+        diabeticDrugs = new ArrayList<>();
+        diabeticDrugs.add("7AA1A"); 
+        diabeticDrugs.add("7AA1E"); 
+        diabeticDrugs.add("7AB1B01"); 
+        diabeticDrugs.add("7AB1B05"); 
+        diabeticDrugs.add("7AB1B07"); 
+        diabeticDrugs.add("7AB1B16"); 
+        diabeticDrugs.add("7AB2A"); 
+        diabeticDrugs.add("7AC2C"); 
+        diabeticDrugs.add("7AC2M"); 
+        diabeticDrugs.add("7AC2N"); 
+        diabeticDrugs.add("7BA1B"); 
+        diabeticDrugs.add("7BA1B01"); 
+        diabeticDrugs.add("7BA1B02"); 
+        diabeticDrugs.add("7BA1B03"); 
+        diabeticDrugs.add("7BA1B04"); 
+        diabeticDrugs.add("7BA1D01"); 
+        diabeticDrugs.add("7BA1D03"); 
+        diabeticDrugs.add("7BA1D04");
+        drools.getWorkingMemory().setGlobal("diabeticDrugs", diabeticDrugs);
+        LOGGER.warn(" inizializing list diabetics Atc ");
+    }else if(LOGGER != null && LOGGER.isInfoEnabled()) {
+        LOGGER.warn("Avoid inizializing list diabetics Atc ");
+    }
+end
+
+rule "080-Dietetici No Demat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug(    
+            $atc : atc != null && 
+            !atc.trim().isEmpty() && 
+            atc.startsWith("4AA2")          
+            )
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+rule "080-Diabetici No Demat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $value : String() from diabeticDrugs
+    $d: Drug( atc == $value)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+
+rule "080-Ossigeno + DPC No Demat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "080")
+     $d: Drug( 
+                activeIngredient != null, activeIngredient.intValue() == 279900 ,
+                (drugFlags["DPC"] != null && drugFlags["DPC"] == true)
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+//Demat flag management
+rule "080-IsNOTDemat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug( 
+                (drugFlags["garrison"] != null && drugFlags["garrison"] == true) || //presidio
+                (drugFlags["psychotropic"] != null && drugFlags["psychotropic"] == true) ||
+                (drugFlags["NoSSN"] != null && drugFlags["NoSSN"] == true) 
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+
+
+rule "OMEGA 3 Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc == "C10AX06")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("OMEGA 3 Rule" + $d);
+    $d.getWarnings().add(new Notification("ER01","validator.drug.omega3Alert"));
+end
+
+
+rule "ATC C08CA01 Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc == "C08CA01")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("ATC C08CA01 Rule" + $d);
+    $d.getWarnings().add(new Notification("ER02","validator.drug.amlodipinaAlert"));
+end
+
+
+
+rule "PPI Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc.startsWith("A02BC"))
+then
+// A02BC Proton pump inhibitors
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("PPI Rule" + $d);
+    $d.getWarnings().add(new Notification("ER03","validator.drug.ppiAlert"));
+end
+
+
+
+rule "ATC B01AB05 Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "080")
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc == "B01AB05")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("ATC B01AB05 Rule" + $d);
+    $d.getWarnings().add(new Notification("ER04","validator.drug.enoxAlert"));
+end
+

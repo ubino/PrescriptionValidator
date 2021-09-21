@@ -1,0 +1,77 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+//Eparine
+rule "130-DPC Not Eparine No Demat Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "130")
+    $d: Drug(  drugFlags["DPC"] != null && drugFlags["DPC"] == true &&
+                atc != null && !atc.trim().isEmpty() &&  !atc.startsWith("B01AB")       
+            )
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("DPC Not Eparine No Demat Rule. Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+
+
+rule "130-DPC Eparine Rule"
+dialect "java"
+enabled false
+no-loop true
+when
+    $validator : Validator(region == "130")
+    $d :Drug(type == 'F', (atc != null && atc.startsWith("B01AB"))// && drugFlags["DPC"] != null && drugFlags["DPC"] == true )
+    ,        $dpcReason : dpcReason
+        )
+
+then
+
+    if(LOGGER != null)
+        LOGGER.info("DPC Eparine Rule " + $d.getDescription());
+    
+    Notification dpc = new Notification("DPC", null);
+    dpc.addChoice("1","Profilassi della Trombosi Venosa Profonda dopo intervento ortopedico maggiore");
+    dpc.addChoice("2","Profilassi della Trombosi Venosa Profonda dopo intervento di chirurgia generale maggiore");
+    dpc.addChoice("-1","Nessuno dei casi precedenti");
+    dpc.setChoiceType("SINGLE");
+    
+    if($dpcReason == null || $dpcReason.isEmpty()){
+        //need to add reason
+        dpc.setMessage("validator.drug.missingDpcReason");
+        $d.getErrors().add(dpc);
+    } else {
+        // can change reason
+        dpc.setMessage("validator.drug.alreadyDpcReason");
+        $d.getInformations().add(dpc);
+        if(LOGGER != null)
+            LOGGER.info("The dpc reason is already specified " + $dpcReason);
+            
+        if($dpcReason.equals("1") || $dpcReason.equals("2") )
+        {
+         //   Se in uno di questi 2 casi, la prescrizione in DPC deve essere fatta solo su ricetta rossa
+         
+            $d.setDemat(false);     
+      
+      // FIXME: va salvato nel campo commento della ricetta il codice dpc
+            $d.addDrugFlags("DPC", new Boolean(true));
+      // FIXME: va salvato nel campo disposizioni regionali della ricetta il codice PHT
+          //  $d.addDrugFlags("PHT", new Boolean(true));
+                   
+            // FIXME:should be re-evaluated the drug???
+            //??pER LE regole sul sostituibile
+            update( $d );
+        }
+        else {
+            if(($d.getDrugFlags() != null || $d.getDrugFlags().get("DPC") == true  )) {//||  $d.getDrugFlags().get("PHT") == true
+             $d.addDrugFlags("DPC", new Boolean(false));
+           
+        }}
+        //Se non prescrivibile in dpc, (per i casi visti prima) entra nel giro delle ricette in convenzionata 
+   
+    }
+end

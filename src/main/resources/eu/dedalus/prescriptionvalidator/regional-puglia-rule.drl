@@ -1,0 +1,44 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+rule "160-Statin"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "160")    
+    $d :Drug(type == 'F', (atc != null && (atc== "C10BA02" || atc == "C10AX09" || atc =="C10BA06" )))
+
+then
+
+    if(LOGGER != null)
+        LOGGER.info("Statine alto costo");
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("statinWarning") ? false : $d.getCheckFlags().get("statinWarning");
+    Notification statin = new Notification("STATIN", "validator.drug.statinWarning");
+    // FIXME: va salvato nel campo disposizioni regionali della ricetta
+    // FIXME: va aggiunta una reason come per sostituibile?? o trattato come warning???
+    statin.setChoiceType("SINGLE");
+    statin.addChoice("CT","CT (in trattamento)");
+    statin.addChoice("NV","NV (paziente Naive)");
+    statin.addChoice("SC","SC (con scheda da Specialista)");
+    
+    if(ignore) {
+    		$d.getInformations().add(statin);
+    	} 
+    else {
+    		$d.getWarnings().add(statin);
+    	}
+end
+
+
+
+rule "160-Humalog Rule"
+enabled false
+when 
+    $validator : Validator(region == "160")    
+    $d : Drug(type == 'F', $minsan: minsan != null && !minsan.trim().isEmpty() && (minsan=="033637380" || minsan=="033637354" || minsan=="033637190" || minsan=="033637051" || minsan=="033637024" ) )
+then
+     if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("160-Humalog Rule {}", $d);
+     $d.getWarnings().add(new Notification("PG01","validator.drug.humalogAlert"));
+end

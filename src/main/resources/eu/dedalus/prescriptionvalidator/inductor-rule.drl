@@ -1,0 +1,38 @@
+package eu.dedalus.prescriptionvalidator;
+
+//Inductor
+rule "150-Inductor Drug Rule"
+dialect "java"
+when
+    $validator : Validator(region == "150" || region == "190")
+    $d: Drug( 
+                checkFlags["inductor"] != null,
+                $inductor : checkFlags["inductor"] == true , 
+                inductor == null || inductor.isEmpty()  
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.error("the doctor must indicate in the inductor code");
+    
+    $d.getErrors().add(new Notification("C01","validator.missingInductorCode"));
+
+end
+
+
+//Inductor
+rule "150-Inductor Procedure Rule"
+dialect "java"
+when
+    $validator : Validator(region == "150" || region == "190")
+    $d: Procedure( 
+                checkFlags["inductor"] != null,
+                $inductor : checkFlags["inductor"] == true , 
+                inductor == null || inductor.isEmpty()  
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.error("the doctor must indicate in the inductor code");
+    
+    $d.getErrors().add(new Notification("C01","validator.missingInductorCode"));
+
+end

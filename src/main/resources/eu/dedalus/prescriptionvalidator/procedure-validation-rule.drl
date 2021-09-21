@@ -1,0 +1,132 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+//Error Rule
+rule "exist Codice Nomenclatore tariffario"
+dialect "java"
+when
+    $p : Procedure(  cntCode == null || cntCode.trim().isEmpty() )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing cnt code" ); 
+    $p.getErrors().add(new Notification("P01","validator.procedure.missingCnt"));
+end
+
+rule "exist Codice catalogo"
+dialect "java"
+when
+    $p : Procedure(  catalogueCode == null || catalogueCode.trim().isEmpty() )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing catalogue code" ); 
+    $p.getErrors().add(new Notification("P02","validator.procedure.missingCatalogue"));
+end
+
+rule "exist branches list"
+dialect "java"
+when
+    $p : Procedure( cntCode != "NO_LEA" && (branches == null || branches.size() == 0) )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing branches list" ); 
+    $p.getErrors().add(new Notification("P03","validator.procedure.missingbranches"));
+end
+
+rule "choose branch if unique"
+dialect "java"
+when
+    $p : Procedure(  branches != null && branches.size() == 1  )
+then
+    if(LOGGER != null)
+        LOGGER.info( "choose branch if unique " ); 
+    $p.setBranch($p.getBranches().get(0));
+end
+
+rule "exist price"
+dialect "java"
+when
+    $p : Procedure(  price == null || price<0 )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing price" ); 
+    $p.getErrors().add(new Notification("P04","validator.procedure.missingPrice"));
+end
+
+rule "procedure with grantedPhysician is garanted"
+// FIXME procedure: per ora il flag granted non è gestito in milleweb
+when 
+    $p : Procedure(checkFlags["grantedPhysician"] != null && checkFlags["grantedPhysician"] == true) // Physician choice
+then
+    if(LOGGER != null)
+        LOGGER.info("Modify granted flag for procedure {}", $p);
+    modify($p) {
+		  setGranted( true )
+		}
+end
+
+rule "PNGLA base management"
+dialect "java"
+salience 2 
+when
+    // sia P un accertamento che è PNGLA per cui il medico/in catalogo non ha scelto il tipo di accesso
+    $p : Procedure( procedureFlags["pngla"] != null &&  procedureFlags["pngla"] == true )
+then
+    // il medico è tenuto a specificare il tipo di accesso
+    if(LOGGER != null)
+        LOGGER.info( "Missing Base pngla management" );
+    
+    Notification note = new Notification("P07","validator.procedure.missingAccessType");
+    if(!$p.getCheckFlags().containsKey("firstAccess")){
+        //notify error
+        $p.getErrors().add(note);
+    } else {
+        //notify information for change choice
+        $p.getInformations().add(note);
+    }
+end
+
+rule "exist urgency for PNGLA and firstAccess"
+dialect "java"
+when
+// FIXME procedure:forse va spostata nelle regole regionali
+    $p : Procedure( procedureFlags["pngla"] != null &&  procedureFlags["pngla"] == true 
+                    && checkFlags["firstAccess"] != null && checkFlags["firstAccess"] == true
+                    && ( urgency == null || urgency.trim().isEmpty() ))
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing urgency for pngla" ); 
+    $p.getErrors().add(new Notification("P06","validator.procedure.missingUrgency"));     
+end
+
+rule "exist prescription notes"
+dialect "java"
+when
+    $p : Procedure( note != null && !note.trim().isEmpty(), $note :note) 
+then
+    Notification n = new Notification("P05", $note);
+    boolean ignore = !$p.getCheckFlags().containsKey("ignoreNote") ? false : $p.getCheckFlags().get("ignoreNote");
+    
+    if(ignore) {
+		$p.getInformations().add(n);
+	} else {
+		$p.getWarnings().add(n);
+	}
+end
+
+rule "rule in office"
+dialect "java"
+when
+ $p : Procedure( procedureFlags["PRINTABLE"] != null &&  procedureFlags["PRINTABLE"] == false,
+                $overTheCounterReason : overTheCounterReason)
+then
+    if(LOGGER != null)
+        LOGGER.debug("No print In Office {}", $p);
+    
+    if ($overTheCounterReason == null || $overTheCounterReason.isEmpty()){
+        $p.setOverTheCounterReason("validator.procedure.inoffice");
+        $p.getWarnings().add(new Notification("OFFICE","validator.procedure.noprint"));
+    }
+    else{
+        $p.getInformations().add(new Notification("OFFICE","validator.procedure.noprint"));
+    }
+end

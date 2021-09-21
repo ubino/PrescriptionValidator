@@ -1,0 +1,87 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+
+global List<String> statinDrugs;
+
+rule "180-init statinDrugs Rule"
+enabled false
+no-loop true
+salience 99
+when
+    $validator : Validator(region == "180")
+then
+    if(statinDrugs == null || statinDrugs.size() == 0){
+        statinDrugs = new ArrayList<>();
+        statinDrugs.add("C10AA01"); 
+        statinDrugs.add("C10AA02"); 
+        statinDrugs.add("C10AA03"); 
+        statinDrugs.add("C10AA04"); 
+        statinDrugs.add("C10AA05"); 
+        statinDrugs.add("C10AA07"); 
+        statinDrugs.add("C10BA02"); 
+        statinDrugs.add("C10AX09"); 
+        statinDrugs.add("C10AB02"); 
+        statinDrugs.add("C10AB05"); 
+        statinDrugs.add("C10AX06"); 
+        statinDrugs.add("A02BC01"); 
+        statinDrugs.add("A02BC02"); 
+        statinDrugs.add("A02BC03"); 
+        statinDrugs.add("A02BC04"); 
+        statinDrugs.add("A02BC05"); 
+        statinDrugs.add("A02BA01"); 
+        statinDrugs.add("A02BA02"); 
+        statinDrugs.add("A02BA03"); 
+        statinDrugs.add("A02BA04"); 
+        statinDrugs.add("A02BA06"); 
+        statinDrugs.add("M01AB55"); 
+        drools.getWorkingMemory().setGlobal("statinDrugs", statinDrugs);
+        LOGGER.warn(" inizializing list statinDrugs Atc ");
+    }else if(LOGGER != null && LOGGER.isInfoEnabled()) {
+        LOGGER.warn("Avoid inizializing list statinDrugs Atc ");
+    }
+end
+
+
+rule "180-Statin Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "180")
+    $value : String() from statinDrugs
+    $d: Drug( atc == $value &&  checkFlags["inductor"] != null && checkFlags["inductor"] == true   )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.error("warning statine-IPP");    
+    $d.getInformations().add(new Notification("CL02","validator.drug.planWarning"));
+
+end
+
+
+
+rule "180-Densitometry Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "180")    
+    $p : Procedure($cntCode : cntCode!=null && cntCode =="88.99.1" || cntCode=="88.99.2" || cntCode=="88.99.3" || cntCode=="88.99.4" || cntCode=="88.99.5" )
+then
+
+    if(LOGGER != null)
+        LOGGER.info("Densiometria ossea");
+    
+    boolean ignore = !$p.getCheckFlags().containsKey("densWarning") ? false : $p.getCheckFlags().get("densWarning");
+    Notification note = new Notification("CL01", "validator.procedure.densWarning");
+    // FIXME: se risponde si va salvato nel campo disposizioni regionali della ricetta il codice DGR
+    
+    note.setChoiceType("SINGLE");
+    note.addChoice("DGR","Si");
+    
+    if(ignore) {
+    		$p.getInformations().add(note);
+    	} 
+    else {
+    		$p.getWarnings().add(note);
+    	}
+end
+

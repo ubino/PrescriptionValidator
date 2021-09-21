@@ -1,0 +1,551 @@
+package eu.dedalus.prescriptionvalidator;
+
+	
+global List<String> minsanNonDisponibili;
+//init rule
+rule "init List minsanNonDisponibili Rule"
+no-loop true
+salience 100
+when
+ //
+then
+ if(minsanNonDisponibili == null || minsanNonDisponibili.size() == 0){
+ 
+        LOGGER.warn(" inizializing list minsanNonDisponibili ");
+        minsanNonDisponibili = new ArrayList<>();
+	
+		String[] minsanListInhixa =  {"045104116","045104344","045104128","045104130","045104369","045104142","045104167","045104179","045104181","045104193","045104205"};
+   
+		minsanNonDisponibili.addAll(Arrays.asList(minsanListInhixa));
+		drools.getWorkingMemory().setGlobal("minsanNonDisponibili", minsanNonDisponibili);
+       
+    }else if(LOGGER != null && LOGGER.isInfoEnabled()) {
+        LOGGER.warn("Avoid inizializing list minsanNonDisponibili ");
+    }
+end
+
+//Error Rule
+rule "exist ATC"
+dialect "java"
+when
+    $d : Drug( type == 'F',  atc == null || atc.trim().isEmpty() )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing Atc" ); 
+    $d.getErrors().add(new Notification("E01","validator.drug.missingAtc"));
+end
+
+rule "exist Minsan"
+dialect "java"
+when
+    $d : Drug(  minsan == null || minsan.trim().isEmpty() )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing Minsan" ); 
+     $d.getErrors().add(new Notification("E02","validator.drug.missingMinsan"));
+end
+
+rule "exist Active Ingredient"
+dialect "java"
+when
+    $d : Drug( type == 'F', activeIngredient == null || activeIngredient <= 0 )
+then
+    if(LOGGER != null)
+        LOGGER.info( "Missing Atc" ); 
+    $d.getErrors().add(new Notification("E03","validator.drug.missingActiveIngredient"));
+end
+
+rule "Note is not selected"
+dialect "java"
+when
+    $d : Drug( availableNotes != null && availableNotes.size() > 0, useNote == null )
+then
+    if(LOGGER != null)
+        LOGGER.info( " UseNote is not defined for Note {}", $d.getNote() ); 
+     $d.getErrors().add(new Notification("E04","validator.drug.useNoteUndefined"));
+end
+
+rule "Note has bad value"
+dialect "java"
+when
+    $d : Drug( availableNotes != null && availableNotes.size() > 0, useNote == true, 
+        (note == null || note.isEmpty() || !availableNotes.contains(note)) )
+    
+then
+    if(LOGGER != null)
+        LOGGER.info( " UseNote is not defined for Note {}", $d.getNote() ); 
+     $d.getErrors().add(new Notification("E06","validator.drug.noteWithBadValue"));
+end
+
+
+rule "IPP Rule"
+when 
+    $d : Drug(equivGroup!=null && !equivGroup.trim().isEmpty() && (equivGroup == "CTB" || equivGroup == "CVB" || equivGroup == "JDQ") && note !="48" ) //Pantoprazolo/Esomeprazolo
+then 
+     if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("IPP Rule {}", $d.getNote());
+              
+    boolean ippIgnore = !$d.getCheckFlags().containsKey("ippIgnore") ? false : $d.getCheckFlags().get("ippIgnore");
+     Notification n = new Notification("E20",null);
+    
+    if ($d.getNote()!= null && $d.getNote().equals("01"))
+         {  n.setMessage ("validator.drug.ippAlert");
+             
+         }
+     else
+          { n.setMessage ("validator.drug.ippAlert2");
+              
+          }
+	
+	if(ippIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }    
+   
+end
+
+rule "Follitropin Rule"
+dialect "java"
+when   
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && (atc=="G03GA06" || atc=="G03GA05"))
+    $validator : Validator( patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="FEMALE" && patientInfo.patientAge!= null && patientInfo.patientAge.intValue() > 44)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Follitropin Rule" + $d);
+    
+    boolean follitropinIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    Notification n = new Notification("E20","validator.drug.follitropinAlert");
+     if(follitropinIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }    
+end
+
+rule "CPA Rule"
+dialect "java"
+when
+    $d: Drug( activeIngredient != null, activeIngredient.intValue() == 103801  )
+    $validator : Validator( patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="FEMALE")
+    
+then
+    // 103801 è CIPROTERONE ACETATO
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+            LOGGER.debug("CPA Rule {}", $d);
+            
+    boolean cpaIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    Notification n = new Notification("E20","validator.drug.cpaAlert");
+     if(cpaIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+rule "FU Rule"
+dialect "java"
+when
+    $d: Drug( activeIngredient != null, activeIngredient.intValue() == 443900  )
+    $validator : Validator( patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="FEMALE")
+    
+then
+//443900 flutamide
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("FU Rule {}", $d);
+     boolean fuIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    Notification n = new Notification("E20","validator.drug.fuAlert");
+     if(fuIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }    
+end
+
+rule "ATC N03AE01 Rule"
+dialect "java"
+when
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc == "N03AE01")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("ATC N03AE01 Rule" + $d);  
+     boolean antiepilepticsIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.antiepilepticsAlert");
+     if(antiepilepticsIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }    
+end
+
+
+
+rule "Heparin Rule"
+dialect "java"
+when   
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc.startsWith("B01AB") && !atc.startsWith("B01AB11") && atc!="B01AB")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Heparin Rule" + $d);
+     boolean heparinIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.heparinAlert");
+     if(heparinIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }        
+        
+end
+
+
+
+rule "Ketorolac Rule"
+dialect "java"
+when   
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc=="M01AB15")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Ketorolac Rule" + $d);
+     boolean ketorolacIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.ketorolacAlert");
+     if(ketorolacIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }            
+end
+
+
+rule "Female-only Rule"
+dialect "java"
+when   
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && atc=="L02BG03")
+    $validator : Validator(patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="MALE" )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Female-only Rule" + $d);
+    boolean femaleOnlyIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.femaleOnly");
+     if(femaleOnlyIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }        
+end
+
+
+rule "Male-only Rule"
+dialect "java"
+when   
+    $d: Drug( $atc : atc != null &&  !atc.trim().isEmpty() && (atc=="G04CA02" || atc=="G04CA01" || atc=="G04CA04" || atc=="L02BB01" || atc=="G03HA01" || atc=="L02AE01" || atc.startsWith("G04CB") ))
+    $validator : Validator( patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="FEMALE" )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Male-only Rule" + $d);
+    boolean maleOnlyIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.maleOnly");
+     if(maleOnlyIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }        
+        
+end
+
+
+
+rule "007 Exemption Rule"
+when 
+    $e : Exemption(type == "P", code == "007" ) //FIXME o tipo P e C che inzia per 007
+    $d : Drug(type == 'F', $minsan: minsan != null && !minsan.trim().isEmpty() && (minsan=="035668058" || minsan=="042471021" || minsan=="042306035" || minsan=="045321027" || minsan=="043374026" || minsan=="042313039" || minsan=="042470029" ) )
+then
+     if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("007 Exemption Rule for drug {}", $d);
+        
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("asthmaAlert") ? false : $d.getCheckFlags().get("asthmaAlert");
+        
+    Notification n = new Notification("E20","validator.drug.asthmaAlert");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); 
+    	} else {
+    		$d.getWarnings().add(n);
+    	}       
+        
+end
+
+
+rule "B2 prescription code Female Rule"
+dialect "java"
+when
+   $d: Drug( typePrescription!=null && !typePrescription.trim().isEmpty() && typePrescription == "B2")
+   $validator : Validator(patientInfo !=null && patientInfo.gender!=null && patientInfo.gender=="FEMALE" )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("B2 prescription code Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("b2AlertFemale") ? false : $d.getCheckFlags().get("b2AlertFemale");
+        
+    Notification n = new Notification("E08","validator.drug.b2AlertFemale");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+rule "B2 prescription code Rule"
+dialect "java"
+when
+   $d: Drug( typePrescription!=null && !typePrescription.trim().isEmpty() && typePrescription == "B2")
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("B2 prescription code Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("b2AlertIgnore") ? false : $d.getCheckFlags().get("b2AlertIgnore");
+        
+    Notification n = new Notification("E22","validator.drug.b2Alert");
+           
+    if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+      } else {
+    		$d.getErrors().add(n);
+    	}   
+    //dosage mandatory
+    boolean ignoreD = !$d.getCheckFlags().containsKey("dosageAlertIgnore") ? false : $d.getCheckFlags().get("dosageAlertIgnore");
+        
+    n = new Notification("POSOL","validator.drug.dosageAlert");
+           
+    if(ignoreD) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+
+rule "AIFA 96 Rule"
+when 
+    $d : Drug(type == 'F', note =="96")
+    $validator : Validator(patientInfo !=null && patientInfo.patientAge!= null  && patientInfo.patientAge.intValue() < 18 )
+    //vitamina D solo per maggiorenni uso la nota
+then 
+     if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("AIFA 96 Rule age: {}", $validator.getPatientInfo().getPatientAge() );
+     
+     $d.getErrors().add(new Notification("E21","validator.drug.note96Alert"));
+	 
+end 
+
+
+rule "4 prescription code Rule"
+enabled false
+dialect "java"
+when
+   $d: Drug(typePrescription!=null && !typePrescription.trim().isEmpty() && typePrescription == "4" )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("4 prescription code Rule" + $d);
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("ICAlertIgnore") ? false : $d.getCheckFlags().get("ICAlertIgnore");
+        
+    Notification n = new Notification("E09","validator.drug.missingInformedConsent");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+    
+    
+end
+
+
+rule "3 prescription code Rule"
+dialect "java"
+when
+   $d: Drug( typePrescription!=null && !typePrescription.trim().isEmpty() && ( typePrescription == "3" || typePrescription == "Z1"))
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("3 prescription code Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("WBCAlertIgnore") ? false : $d.getCheckFlags().get("WBCAlertIgnore");
+        
+    Notification n = new Notification("E10","validator.drug.missingWBCCount");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+
+rule "Alert minsanNonDisponibili Rule"
+when
+ $value : String() from minsanNonDisponibili
+ $d: Drug(type == 'F' , $minsan: minsan != null && !minsan.trim().isEmpty() && $value == minsan )
+then 
+     if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("minsanNonDisponibili Rule" + $d);
+     boolean alertIgnore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+     Notification n = new Notification("E20","validator.drug.nonDisponibili");
+     if(alertIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }        
+end
+
+
+/*
+ * Granted Rules (National)
+ */
+ 
+rule "OTC is not garanted"
+when 
+    $d : Drug( type == 'P' )
+then
+    if(LOGGER != null)
+        LOGGER.info("Modify granted flag for OTC drug {}", $d);
+    modify($d) {
+		  setGranted(false)
+		}    
+   // $d.setGranted(false);
+end
+
+rule "No type is PharmaDati garanted Flag"
+// questa regola va ad applicare il flag di farmadati alle classi
+// di prodotti non considerati da altre regole
+when 
+    $d : Drug(group == null || group.isEmpty() )
+then
+    boolean licensable = false;
+    if($d.getDrugFlags() != null && $d.getDrugFlags().containsKey("licensable")){
+        licensable = $d.getDrugFlags().get("licensable");
+    }
+    if(LOGGER != null)
+        LOGGER.info("Modify granted flag in accordion to PharmaDati drug {}", $d);
+    modify($d) {
+		  setGranted(licensable)
+		}       
+end
+
+rule "fascia A without note is garanted"
+when 
+    $d : Drug(group == "A", (availableNotes == null || availableNotes.size() == 0),
+             (checkFlags["grantedPhysician"] == null || checkFlags["grantedPhysician"] == false)) // Physician choice
+then
+    if(LOGGER != null)
+        LOGGER.info("Modify granted flag FASCIA A for drug {}", $d);
+    modify($d) {
+		  setGranted(true)
+		}       
+end
+
+rule "fascia A with Note is granted if the physician use the note"
+when 
+     $d : Drug( group == "A" && availableNotes != null && availableNotes.size() > 0, $useNote : useNote)
+then
+    boolean granted = ($useNote == null || $useNote == false) ? false : true;
+     if(LOGGER != null)
+        LOGGER.info("Modify granted flag " + granted + " for drug " + $d);
+     modify($d) {
+		  setGranted(granted)
+		}     
+end
+
+rule "fascia C"
+salience 2 //has priority over the rule "fascia C with war invalidity Exemption"
+no-loop true
+when 
+     $d : Drug( group == "C")
+then
+   if(LOGGER != null)
+        LOGGER.info("Modify granted flag FASCIA C for drug {}", $d);
+   modify($d) {
+		  setGranted(false)
+		} 
+end
+
+rule "fascia C with war invalidity Exemption"
+salience 1 //has priority over the rule "Assign Available Exemption Rule"
+no-loop true
+when 
+    $e : Exemption(type == "INV", code == "WAR" )
+    $d : Drug( group == "C" && (exemption == null || exemption.weight < 11 ) 
+              && (checkFlags["grantedPhysician"] == null || checkFlags["grantedPhysician"] == false))
+then
+    $e.setWeight(11);
+    $d.setExemption($e);
+    $d.setGranted(true);
+     if(LOGGER != null)
+        LOGGER.info("Modify granted flag FASCIA C for drug and WAR-INV {}", $d);
+    $d.getWarnings().add(new Notification("WAR","validator.drug.war"));
+    update( $d )
+end
+
+/*
+ * Demat Rule (Nazional)
+*/
+rule "Naz-Ossigeno No Demat Rule"
+dialect "java"
+when
+    $d: Drug( activeIngredient != null, activeIngredient.intValue() == 279900 )
+    $validator : Validator(region != "080" && region != "150")
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("Is a RED prescription {}", $d);
+    $d.setDemat(false);
+end
+
+
+
+rule "Naz- Physician set Not granted Rule"
+salience -100
+when 
+    $d : Drug(checkFlags["grantedPhysician"] != null && checkFlags["grantedPhysician"] == true && isGranted()==false)
+then
+    if (!$d.getErrors().isEmpty()){
+        if ($d.getErrors().stream().filter(x -> "PHT".equals(x.getCode())).findFirst().isPresent()) {
+        
+               $d.addCheckFlags("ForcePHT", new Boolean(false));
+         
+        }
+		
+		if ($d.getErrors().stream().filter(x -> "C02".equals(x.getCode())).findFirst().isPresent()) {
+               $d.addCheckFlags("mandatoryProblem", new Boolean(false));
+         
+        }
+			
+          $d.getErrors().removeIf(x ->( !x.getCode().equals("P2D") &&  !x.getCode().equals("T2D") &&  !x.getCode().equals("D2D"))) ;
+    } 
+
+end
+
+
+/*
+ * QP particularity management
+ */
+rule "Naz-QP (compartecipazione spesa paziente)"
+dialect "java"
+when
+    //se il medico non ha fatto una scelta e non concesso e ha QP 
+	 $d: Drug( (checkFlags["grantedPhysician"] == null || checkFlags["grantedPhysician"] == false)
+	            && isGranted() == false && drugFlags["QP"] != null && drugFlags["QP"] == true)
+then
+    // rendilo concesso
+	modify($d) {
+	  setGranted(true)
+	} 
+end
+
+
+
+

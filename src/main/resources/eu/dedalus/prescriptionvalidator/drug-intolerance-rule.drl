@@ -1,0 +1,132 @@
+package eu.dedalus.prescriptionvalidator;
+
+/* P2D - patient to drug intolerance */
+rule "Patient Drug intolerance MINSAN"
+dialect "java"
+
+when
+    $patientIntolerance : DrugIntolerance( $minsan : minsan != null )
+    $d : Drug(minsan == $minsan)
+then
+    boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("P2DIgnore") ? false : $d.getCheckFlags().get("P2DIgnore");
+    if(LOGGER != null)
+        LOGGER.info( "Patient Intolerance MINSAN check {}", $minsan );
+    
+    Notification n = new Notification("P2D", null);
+    n.setReferenceCode("MINSAN");
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+rule "Patient Drug intolerance DESCRIPTION"
+dialect "java"
+
+when
+    $patientIntolerance : DrugIntolerance( $description : description != null )
+    $d : Drug(description == $description)
+then
+    boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("P2DIgnore") ? false : $d.getCheckFlags().get("P2DIgnore");
+    if(LOGGER != null)
+        LOGGER.info( "Patient Intolerance DESCRIPTION check {}", $d.getDescription() );
+        
+    Notification n = new Notification("P2D", null);
+    n.setReferenceCode("DESCRIPTION");
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+rule "Patient Drug intolerance Active Ingredient"
+dialect "java"
+
+when
+    $patientIntolerance : DrugIntolerance( $ai : activeIngredient > 0 )
+    $d : Drug(activeIngredient == $ai)
+then
+    boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("P2DIgnore") ? false : $d.getCheckFlags().get("P2DIgnore");
+    if(LOGGER != null)
+        LOGGER.info( "Patient Intolerance Active Ingredient check {}", $d.getDescription() );
+    
+    Notification n = new Notification("P2D", null);
+    n.setReferenceCode("ACTIVEINGREDIENT");
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+rule "Patient Drug intolerance ATC"
+dialect "java"
+
+when
+    $patientIntolerance : DrugIntolerance( $atc : atc != null )
+    $d : Drug( atc != null && atc.startsWith($atc))
+then
+    boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("P2DIgnore") ? false : $d.getCheckFlags().get("P2DIgnore");
+    if(LOGGER != null)
+        LOGGER.info( "Patient Intolerance check ATC {}", $d.getDescription() );
+    
+    Notification n = new Notification("P2D", null);
+    n.setReferenceCode("ATC");
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+/* T2D - therapy to drug intolerance */
+rule "Therapy Drug intolerance Active Ingredient"
+dialect "java"
+
+when
+    // sia $therapy una terapia continuativa con principio attivo $ai
+    $therapy : ContinuousTherapy( $ai : activeIngredient )
+    // sia $d un farmaco che ha delle intolleranze e il principio attivo diverso da $ai
+    $d       : Drug( $intolerances : intolerances != null, $ai1 : activeIngredient != $ai)
+    $intolerance : Interaction() from $intolerances
+    eval($intolerance.getActiveIngredient().intValue() == $ai.intValue())
+then
+    boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("T2DIgnore") ? false : $d.getCheckFlags().get("T2DIgnore");
+    if(LOGGER != null)
+         LOGGER.info( "Continuous Therapy Intolerance check {} {}", $ai1 , $ai );
+         
+    Notification n = new Notification("T2D", $intolerance.getEffect());
+    n.setReferenceDisplay($therapy.getDescription());
+    
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end
+
+/* D2D - drug to drug intolerance */
+rule "DrugToDrug Intolerance"
+dialect "java"
+
+when
+    $d          : Drug( $intolerances : intolerances != null, $ai1 : activeIngredient )
+    $d2         : Drug( activeIngredient != null, $ai : activeIngredient != $ai1)
+    $intolerance : Interaction() from $intolerances
+    eval($intolerance.getActiveIngredient().intValue() == $ai.intValue())
+then
+   boolean intoleranceIgnore = !$d.getCheckFlags().containsKey("D2DIgnore") ? false : $d.getCheckFlags().get("D2DIgnore");
+   if(LOGGER != null)
+        LOGGER.info( "Intolerance check {} {}", $ai1 , $ai);
+        
+    Notification n = new Notification("D2D", $intolerance.getEffect());
+    n.setReferenceDisplay($d2.getDescription());
+    n.setReferenceCode($d2.getId());
+    if(intoleranceIgnore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getWarnings().add(n);
+    }
+end

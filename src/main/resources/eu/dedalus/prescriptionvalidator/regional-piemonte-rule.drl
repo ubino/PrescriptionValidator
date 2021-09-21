@@ -1,0 +1,591 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+global List<String> lista_piemonte_lotto_abasaglar ;
+global List<String> lista_piemonte_lotto_retacrit ;
+global List<String> lista_piemonte_lotto_accofil ;
+global List<String> lista_piemonte_lotto_nivestim ;
+global List<String> lista_piemonte_lotto_ovaleap ;
+global List<String> lista_piemonte_lotto_meriofert ;
+global List<String> lista_piemonte_biosimilar ;
+
+
+
+rule "010- init List biosimilar Rule"
+enabled false
+no-loop true
+salience 99
+when
+    $validator : Validator(region == "010")
+then
+    if(lista_piemonte_biosimilar == null || lista_piemonte_biosimilar.size() == 0){
+        lista_piemonte_biosimilar = new ArrayList<>();
+        lista_piemonte_lotto_abasaglar = new ArrayList<>();
+        lista_piemonte_lotto_retacrit = new ArrayList<>();
+        lista_piemonte_lotto_accofil = new ArrayList<>();
+        lista_piemonte_lotto_nivestim = new ArrayList<>();
+        lista_piemonte_lotto_ovaleap = new ArrayList<>();
+        lista_piemonte_lotto_meriofert = new ArrayList<>();
+        
+        String[] piemonte_lotto_abasaglar =  {"035724069","035724121","035724246"};        
+        String[] piemonte_lotto_retacrit =  {"027015142","027015155","027015167","027015179","027015181","027015231","027015243","027015268","027015282","038190017","038190031","038190056","038190070","038190094","038190118","038190132","038190157","038190284","038190308","038190322","038190346","038190359","038190373","038190411","038190450","038190474","038190498","038190512","039474022","039474046","039474061","039474085","039474109","039474123","039474186","039474248","039474299","039474301","039474325","039474349","034430292","034430316","034430330","034430355","034430417","034430431","034430456"};
+        String[] piemonte_lotto_accofil =  {"040158040","039481092","039481104","027772033","027772096","039125012","043615057"};
+        String[] piemonte_lotto_nivestim =  {"040158014","040158077","039125051","043615119"};
+        String[] piemonte_lotto_ovaleap =  {"043364049","043364052","043364126","043364140","043029014","043029026","043029038","032392336","032392348","032392351"};
+        String[] piemonte_lotto_meriofert =  {"043275015","043275027","043275041","043275054","036749024"};
+        
+        lista_piemonte_lotto_abasaglar.addAll(Arrays.asList(piemonte_lotto_abasaglar));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_abasaglar));        
+        lista_piemonte_lotto_retacrit.addAll(Arrays.asList(piemonte_lotto_retacrit));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_retacrit));
+        lista_piemonte_lotto_accofil.addAll(Arrays.asList(piemonte_lotto_accofil));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_accofil));
+        lista_piemonte_lotto_nivestim.addAll(Arrays.asList(piemonte_lotto_nivestim));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_nivestim));
+        lista_piemonte_lotto_ovaleap.addAll(Arrays.asList(piemonte_lotto_ovaleap));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_ovaleap));
+        lista_piemonte_lotto_meriofert.addAll(Arrays.asList(piemonte_lotto_meriofert));
+        lista_piemonte_biosimilar.addAll(Arrays.asList(piemonte_lotto_meriofert));
+        
+        
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_abasaglar", lista_piemonte_lotto_abasaglar);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_retacrit", lista_piemonte_lotto_retacrit);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_accofil", lista_piemonte_lotto_accofil);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_nivestim", lista_piemonte_lotto_nivestim);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_ovaleap", lista_piemonte_lotto_ovaleap);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_lotto_meriofert", lista_piemonte_lotto_meriofert);
+        drools.getWorkingMemory().setGlobal("lista_piemonte_biosimilar", lista_piemonte_biosimilar);
+        LOGGER.warn(" inizializing list lista_piemonte_biosimilar "+ lista_piemonte_biosimilar);
+    }else if(LOGGER != null && LOGGER.isInfoEnabled()) {
+        LOGGER.warn("Avoid inizializing list lista_piemonte_biosimilar ");
+    }
+end
+
+
+//biosimilari
+rule "010-Biosimilar Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $value : String() from lista_piemonte_biosimilar
+    $d: Drug(    type == 'F' , $minsan: minsan != null && !minsan.trim().isEmpty() && $value == minsan)
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-Biosimilar Rule " + $d);
+    Notification alert = new Notification("PM01", null);
+           
+    if ( lista_piemonte_lotto_abasaglar.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar1");
+      }
+    else if ( lista_piemonte_lotto_retacrit.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar2");
+      }  
+    else if ( lista_piemonte_lotto_accofil.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar3");
+      }  
+    else if ( lista_piemonte_lotto_nivestim.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar4");
+      }  
+    else if ( lista_piemonte_lotto_ovaleap.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar5");
+      }  
+    else if ( lista_piemonte_lotto_meriofert.contains($minsan)){
+        alert.setMessage("validator.drug.biosimilar6");
+      }  ;
+    if (alert.getMessage()!=null){    
+    	$d.getInformations().add(alert);
+     };
+end
+
+
+
+//Eparine
+rule "010-Eparine No Demat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(    
+            $atc : atc != null && 
+            !atc.trim().isEmpty() && 
+            atc.startsWith("B01AB")          
+            )
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+rule "010-IsNOTDemat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug( 
+                (drugFlags["garrison"] != null && drugFlags["garrison"] == true) || //presidio
+                (drugFlags["psychotropic"] != null && drugFlags["psychotropic"] == true) ||
+                (drugFlags["NoSSN"] != null && drugFlags["NoSSN"] == true)
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+
+
+
+rule "010-EBPM IVOR 2500 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(    
+            $atc :atc,  $minsan: minsan , $equivGroup : equivGroup,
+            atc != null && !atc.trim().isEmpty() && atc=="B01AB12" &&  minsan !="035577028" && equivGroup=="I4B") 
+            
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-Eparine IVOR 250 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+
+    alert.setReferenceDisplay("IVOR*10SIR 2500UI 0,2ML");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+rule "010-EBPM IVOR 3500 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(    
+            $atc :atc,  $minsan: minsan , 
+            atc != null && !atc.trim().isEmpty() && atc=="B01AB12" &&  minsan !="035577067" && equivGroup=="I4C") 
+            
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-Eparine IVOR 3500 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+
+    alert.setReferenceDisplay("IVOR*10SIR 3500UI 0,2ML");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+rule "010-EBPM inhixa 2000 Alert Rule"
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug( $atc :atc,  $minsan: minsan , 
+            atc != null && !atc.trim().isEmpty() && atc=="B01AB05" &&  minsan !="045104027" && equivGroup in ("KKQ", "KSC", "KFU")) 
+            
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM inhixa 2000 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+
+    alert.setReferenceDisplay("INHIXA*10SIR 2000UI 0,2ML");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM ENOXAPARINA 4000 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB05" &&  minsan !="044039079" && equivGroup in ("KSD","KHR","KFV"))             
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM ENOXAPARINA 4000 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+
+    alert.setReferenceDisplay("ENOXAPARINA ROVI*6SIR 4000UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+rule "010-EBPM CLEXANE 6000 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB05" &&  minsan !="029111085" && equivGroup in ("KSE","KSF"))             
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM CLEXANE 6000 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+
+    alert.setReferenceDisplay("CLEXANE T*10SIR 6000UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM CLEXANE 8000 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB05" &&  minsan !="029111097" && equivGroup in ("KSG","KSH"))             
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM CLEXANE 8000 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	    
+    alert.setReferenceDisplay("CLEXANE T*10SIR 8000UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM ENOXAPARINA 1000 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB05" &&  minsan !="044039269" && equivGroup in ("KSA","KSB"))             
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM ENOXAPARINA 1000 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	    
+    
+    alert.setReferenceDisplay("ENOXAPARINA ROVI*10SIR 10000UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+rule "010-EBPM SELEPARINA 2850 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="026738017" && (equivGroup in ("D3A") || minsan=="026736064") )
+               //FIXME 026736064 ha gruppo eq null              
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEPARINA 2850 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	    
+    alert.setReferenceDisplay("SELEPARINA*6SIR 0,3ML 2850UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+rule "010-EBPM SELEPARINA 3800 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="026738056" && (equivGroup in ("D3B") || minsan=="026736076") )
+               //FIXME 026736076 ha gruppo eq null              
+then
+   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEPARINA 3800 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+       
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	    
+    alert.setReferenceDisplay("SELEPARINA*6SIR 0,4ML 3800UI");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+rule "010-EBPM SELEPARINA 5700 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="026738070" && (equivGroup in ("D3C") || minsan=="026736088") )
+               //FIXME 026736088 ha gruppo eq null              
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEPARINA 5700 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+    
+    alert.setReferenceDisplay("SELEPARINA*10SIR 5700UI 0,6ML");
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM SELEPARINA 7600 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="026738094" && (equivGroup in ("D3D") || minsan=="026736090") )
+               //FIXME 026736090 ha gruppo eq null              
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEPARINA 7600 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+     alert.setReferenceDisplay("SELEPARINA*10SIR 7600UI");
+    
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM SELEPARINA 9500 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="026738118" && (equivGroup in ("D3E") || minsan=="026736102") )
+               //FIXME 026736102 ha gruppo eq null              
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEPARINA 9500 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+    
+    alert.setReferenceDisplay("SELEPARINA*10SIR 9500UI");
+    
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+rule "010-EBPM SELEDIE 11400 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="034668018" && (equivGroup in ("D3F") || minsan=="036458014") )
+               //FIXME 036458014 ha gruppo eq null              
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEDIE 11400 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+    
+    alert.setReferenceDisplay("SELEDIE*2SIR 11400UI 0,6ML");
+    
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+rule "010-EBPM SELEDIE 15200 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB06" &&  minsan !="034668044" && (equivGroup in ("D3G") || minsan=="036458040") )
+               //FIXME 036458040 ha gruppo eq null              
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM SELEDIE 15200 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+    alert.setReferenceDisplay("SELEDIE*2SIR 15200UI 0.8ML");
+    
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+
+rule "010-EBPM FLUXUM 6400 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB07" &&  minsan !="026270090" && equivGroup in ("Q3C"))
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM  FLUXUM 6400 Alert Rule atc {} minsan {}" , $atc, $minsan);
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+   
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+	
+    alert.setReferenceDisplay("FLUXUM*SC 6SIR 0,6ML 6400UIAXA");
+    
+	if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    } 
+end
+
+
+
+
+rule "010-EBPM FLUXUM 3200 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB07" &&  minsan !="026270076" && equivGroup in ("Q3A"))
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM  FLUXUM 3200 Alert Rule atc {} minsan {}" , $atc, $minsan);
+        
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+    alert.setReferenceDisplay("FLUXUM*SC 6SIR 0,3ML 3200UIAXA");
+    if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    }         
+end
+
+
+rule "010-EBPM FLUXUM 8500 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB07" &&  minsan !="026270126" && equivGroup in ("Q3D"))
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM  FLUXUM 8500 Alert Rule atc {} minsan {}" , $atc, $minsan);
+   
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+    alert.setReferenceDisplay("FLUXUM*SC 6SIR 0,8ML 8500UIAXA");
+    if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    }         
+end
+
+
+rule "010-EBPM FLUXUM 4250 Alert Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "010")
+    $d: Drug(  $atc :atc,  $minsan: minsan ,
+               atc != null && !atc.trim().isEmpty() && atc=="B01AB07" &&  minsan !="026270088" && equivGroup in ("Q3B"))
+then   
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("010-EBPM  FLUXUM 4250 Alert Rule atc {} minsan {}" , $atc, $minsan);
+        
+    boolean ignore = !$d.getCheckFlags().containsKey("alertIgnore") ? false : $d.getCheckFlags().get("alertIgnore");
+    
+    Notification alert = new Notification("PM02", "validator.drug.successfulBidder");
+    alert.setReferenceDisplay("FLUXUM*SC 6SIR 0,4ML 4250UIAXA");
+     if(ignore) {
+        $d.getInformations().add(alert);
+    } else {
+        $d.getWarnings().add(alert);
+    }         
+end

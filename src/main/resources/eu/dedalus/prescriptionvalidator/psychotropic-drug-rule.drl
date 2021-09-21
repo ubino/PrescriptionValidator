@@ -1,0 +1,320 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+
+rule "No demat ZR Drugs"
+dialect "java"
+when
+    $d: Drug(  type == 'F' &&  drugFlags["ZR"] != null && drugFlags["ZR"] == true)
+then
+    if(LOGGER != null)
+        LOGGER.debug("No demat ZR Drugs {}", $d);
+    $d.setDemat(false);    
+    
+end
+
+
+rule "No demat ZS Drugs without TDL"
+//enabled false
+dialect "java"
+when
+
+    $validator : Validator(region != "190")
+    $d: Drug(  type == 'F' &&  drugFlags["ZS"] != null && drugFlags["ZS"] == true && exemption != null && !exemption.code.startsWith("TDL"))
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("No demat ZS Drugs {}", $d);
+    $d.setDemat(false);    
+    
+end
+
+
+
+rule "demat ZS Drugs with TDL"
+//enabled false
+dialect "java"
+when
+
+    $validator : Validator(region != "190")
+    $d: Drug(  type == 'F' &&  drugFlags["ZS"] != null && drugFlags["ZS"] == true && exemption != null && exemption.code.startsWith("TDL"))
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("demat ZS Drugs with TDL {}", $d);
+    $d.setDemat(true);    
+    
+end
+
+rule "No demat ZS Drugs without TDL exemption"
+dialect "java"
+when
+    $validator : Validator(region != "190")
+    $d: Drug(  type == 'F' &&  drugFlags["ZS"] != null && drugFlags["ZS"] == true )
+    not Exemption( type == 'A' && code.startsWith("TDL") ) 
+then
+    if(LOGGER != null)
+        LOGGER.debug("No demat ZS Drugs {}", $d);
+    $d.setDemat(false);    
+    
+end
+
+
+
+rule "No demat Sez A with demat_flag null"
+dialect "java"
+when 
+    $validator : Validator(region != "190")
+    $d: Drug(  type == 'F' &&  psychotropicCategory == "A" && (drugFlags["dematFlagIsNull"] != null && drugFlags["dematFlagIsNull"] == true)  )
+           
+then
+    if(LOGGER != null)
+        LOGGER.debug("No demat ZR Drugs {}", $d);
+    $d.setDemat(false);    
+    
+end
+
+
+rule "Sez A No print ZS Drugs without TDL"
+dialect "java"
+when
+ $validator : Validator(region != "190")
+ $d: Drug(  type == 'F' &&  psychotropicCategory == "A"  && drugFlags["ZS"] != null && drugFlags["ZS"] == true && exemption != null && !exemption.code.startsWith("TDL")
+                && supplyType!=null && !supplyType.trim().isEmpty() 
+               && (supplyType == "E2" || supplyType == "E1" ||supplyType == "e"), 
+               $overTheCounterReason : overTheCounterReason )
+    
+then
+     if(LOGGER != null)
+        LOGGER.debug("No print RMR Drugs {}", $d);
+  
+    if ($overTheCounterReason == null || $overTheCounterReason.isEmpty()){
+        $d.setOverTheCounterReason("validator.drug.rmr");
+        $d.getWarnings().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    else{
+        $d.getInformations().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    
+end
+
+
+rule "Sez A No print ZS Drugs without TDL exemption"
+dialect "java"
+when
+
+ $validator : Validator(region != "190")
+ $d: Drug(  type == 'F' &&  psychotropicCategory == "A"  && drugFlags["ZS"] != null && drugFlags["ZS"] == true 
+                && supplyType!=null && !supplyType.trim().isEmpty() 
+               && (supplyType == "E2" || supplyType == "E1" ||supplyType == "e"), 
+               $overTheCounterReason : overTheCounterReason )
+ not Exemption(type == 'A' && code.startsWith("TDL")) 
+then
+     if(LOGGER != null)
+        LOGGER.debug("No print RMR Drugs {}", $d);
+  
+    if ($overTheCounterReason == null || $overTheCounterReason.isEmpty()){
+        $d.setOverTheCounterReason("validator.drug.rmr");
+        $d.getWarnings().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    else{
+        $d.getInformations().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    
+end
+
+
+rule "3BIS overTheCounterReason set null Rule"
+dialect "java"
+when
+    //allegato 3bis+ricetta a ricalco con TDL 
+    
+    $validator : Validator(region != "190")
+    $d: Drug( type == 'F' &&  psychotropicCategory == "A"  && drugFlags["ZS"] != null && drugFlags["ZS"] == true &&
+			  exemption != null && exemption.code.startsWith("TDL") ,$overTheCounterReason : overTheCounterReason)
+then
+    if(LOGGER != null)
+        LOGGER.debug("Is a demat prescription {}", $d);
+   
+       if ($overTheCounterReason!= null )
+            $d.setOverTheCounterReason(null);
+   
+	
+end
+
+
+//sezione A con flag demat ZR o null
+rule "Sez A No print RMR Drugs"
+dialect "java"
+when
+    $d: Drug(  type == 'F' &&  psychotropicCategory == "A" &&  ( (drugFlags["ZR"] != null && drugFlags["ZR"] == true) || ((drugFlags["dematFlagIsNull"] != null && drugFlags["dematFlagIsNull"] == true)) )
+               && supplyType!=null && !supplyType.trim().isEmpty() 
+               && (supplyType == "E2" || supplyType == "E1" ||supplyType == "e" ), 
+               $overTheCounterReason : overTheCounterReason
+            )
+then
+    if(LOGGER != null)
+        LOGGER.debug("No print RMR Drugs {}", $d);
+  
+    if ($overTheCounterReason == null || $overTheCounterReason.isEmpty()){
+        $d.setOverTheCounterReason("validator.drug.rmr");
+        $d.getWarnings().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    else{
+        $d.getInformations().add(new Notification("RMR","validator.drug.noprint"));
+    }
+end
+
+
+//dati obbligatori
+
+rule "3BIS Mandatory Dosage Info Rule"
+dialect "java"
+when
+//Posologia obbligatoria per farmaci  all'allegato 3 bis 
+   $d: Drug(  type == 'F' && typePrescription!=null && !typePrescription.trim().isEmpty() &&  typePrescription == "t" &&
+      group == "A"  && (drugFlags["ZR"] == null || drugFlags["ZR"] == false) )
+	
+	// TODO : ???non va bene per Veneto--->classe c tipo ZS es. tachidol
+	//  $d: Drug(  type == 'F'  && drugFlags["ZS"] != null && drugFlags["ZS"] == true && psychotropicCategory!= null && ( psychotropicCategory == "A" || psychotropicCategory == "D"))
+	  
+  
+then
+    if(LOGGER != null )
+        LOGGER.debug("3BIS A Mandatory dosage info Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("dosageAlertIgnore") ? false : $d.getCheckFlags().get("dosageAlertIgnore");
+        
+    Notification n = new Notification("POSOL","validator.drug.dosageAlert");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+
+rule "3BIS-Sez A Mandatory Practitioner Telephone Number Rule"
+dialect "java"
+when
+//telefono medico obbligatorio per farmaci  all'allegato 3 bis sez A
+    $validator : Validator(region == "150" || region == "190")
+    $d: Drug(  type == 'F' && psychotropicCategory == "A" &&
+	          typePrescription!=null && !typePrescription.trim().isEmpty() &&  typePrescription == "t" &&
+			  group == "A" 	 && (drugFlags["ZR"] == null || drugFlags["ZR"] == false)
+			  )
+    
+then
+    if(LOGGER != null )
+        LOGGER.debug("3BIS-Sez A Practitioner Telephone Number Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("telephoneAlertIgnore") ? false : $d.getCheckFlags().get("telephoneAlertIgnore");
+        
+    Notification n = new Notification("E24","validator.drug.telephoneAlert");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+
+
+rule "3BIS-Sez A Mandatory Practitioner Address Rule"
+dialect "java"
+when
+//indirizzo medico obbligatorio per farmaci  all'allegato 3 bis sez A
+    $validator : Validator(region == "150" || region == "190")
+    $d: Drug(type == 'F' && psychotropicCategory == "A" &&
+	          typePrescription!=null && !typePrescription.trim().isEmpty() &&  typePrescription == "t" &&
+			  group == "A"  && (drugFlags["ZR"] == null || drugFlags["ZR"] == false)
+			  //&&  exemption != null && exemption.getCode().startsWith("TDL")
+			  )
+    
+then
+    if(LOGGER != null )
+        LOGGER.debug("3BIS-Sez A Practitioner Address Rule" + $d);
+    boolean ignore = !$d.getCheckFlags().containsKey("addressAlertIgnore") ? false : $d.getCheckFlags().get("addressAlertIgnore");
+        
+    Notification n = new Notification("E25","validator.drug.addressAlert");
+           
+    	if(ignore) {
+    		$d.getInformations().add(n); //FIXME: o non devo mandare messaggio?
+    	} else {
+    		$d.getErrors().add(n);
+    	}   
+end
+
+
+rule "190-3BIS overTheCounterReason set null Rule"
+dialect "java"
+when
+    //allegato 3bis+ricetta a ricalco con TDL 
+    
+    $validator : Validator(region == "190")
+    $d: Drug( type == 'F' &&  psychotropicCategory == "A"  && drugFlags["ZS"] != null && drugFlags["ZS"] == true
+			  && checkFlags["TDL"] != null && checkFlags["TDL"] == true && overTheCounterReason!=null )
+
+then
+    if(LOGGER != null)
+        LOGGER.debug("3BIS overTheCounterReason set null Rule {}", $d);
+   
+      // if ($overTheCounterReason!= null)
+            $d.setOverTheCounterReason(null);
+   
+end
+
+
+rule "190-Sez A No print ZS Drugs without TDL"
+dialect "java"
+when
+ $validator : Validator(region == "190")
+ $d: Drug(  type == 'F' &&  psychotropicCategory == "A"  && drugFlags["ZS"] != null && drugFlags["ZS"] == true 
+            && (checkFlags["TDL"] == null || checkFlags["TDL"] == false)
+            && supplyType!=null && !supplyType.trim().isEmpty() 
+            && (supplyType == "E2" || supplyType == "E1" ||supplyType == "e"), 
+               $overTheCounterReason : overTheCounterReason )
+    
+then
+     if(LOGGER != null)
+        LOGGER.debug("190-No print RMR Drugs {}", $d);
+  
+    if ($overTheCounterReason == null || $overTheCounterReason.isEmpty()){
+        $d.setOverTheCounterReason("validator.drug.rmr");
+        $d.getWarnings().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    else{
+        $d.getInformations().add(new Notification("RMR","validator.drug.noprint"));
+    }
+    
+end
+
+rule "190-No demat ZS Drugs without TDL"
+dialect "java"
+when
+
+    $validator : Validator(region == "190")
+    $d: Drug(  type == 'F' &&  drugFlags["ZS"] != null && drugFlags["ZS"] == true  && (checkFlags["TDL"] == null || checkFlags["TDL"] == false))
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("190-No demat ZS Drugs {}", $d);
+    $d.setDemat(false);    
+    
+end
+
+
+rule "190-demat ZS Drugs with TDL"
+dialect "java"
+when
+    $validator : Validator(region == "190")
+    $d: Drug(  type == 'F' &&  drugFlags["ZS"] != null && drugFlags["ZS"] == true && checkFlags["TDL"] != null && checkFlags["TDL"] == true)
+    
+then
+    if(LOGGER != null)
+        LOGGER.debug("190-demat ZS Drugs with TDL {}", $d);
+    $d.setDemat(true);    
+    
+end
+
+

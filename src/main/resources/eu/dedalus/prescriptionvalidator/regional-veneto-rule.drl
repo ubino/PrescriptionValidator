@@ -1,0 +1,73 @@
+package eu.dedalus.prescriptionvalidator;
+
+global List<String> listaVenetoResidenti;
+
+
+rule "050- init List listaVenetoResidenti Rule"
+enabled false
+no-loop true
+salience 99
+when
+    $validator : Validator(region == "050")
+then
+    if(listaVenetoResidenti == null || listaVenetoResidenti.size() == 0){
+        listaVenetoResidenti = new ArrayList<>();
+        //sono codici catalogo regionali
+        String[] listaCodici =  {"14.75_2","14.75_3","23.01_0","23.09_0","23.19_2","23.19_3","23.19_4","23.19_5","23.19_6",
+        "23.20.1_0","23.20.2_0","23.20.3_0","23.43.6_0","23.49.1_0","23.71.1_0","23.71.2_0","24.00.1_2","24.00.1_3","24.20.1_2","24.20.1_3","24.20.1_4",
+        "24.39.1_0","24.70.1_0","24.70.2_0","24.80.1_0","24.80.2_0","69.92.3_0","69.92.4_0","69.92.5_0","69.92.6_0","87.12.2_2","87.12.2_3","88.99.1_2",
+        "88.99.1_3","88.99.1_4","88.99.1_5","88.99.1_6","88.99.1_7","88.99.1_8","88.99.1_9","88.99.3_2","88.99.3_3","88.99.4_2","88.99.4_3","88.99.5_2",
+        "88.99.5_3","88.99.6_2","88.99.6_3","88.99.7_2","88.99.7_3","88.99.7_4","88.99.7_5","88.99.8_2","88.99.8_3","90.12.F_2","90.12.F_3","90.20.7_2",
+        "90.20.7_3","90.20.7_4","90.20.7_5","90.20.7_6","90.20.7_7","90.20.7_8","90.20.7_9","90.20.7_10","90.20.7_11","90.20.7_12","90.20.7_13","90.20.7_14",
+        "90.20.7_15","90.20.7_16","90.20.7_17","90.20.7_18","90.20.7_19","90.20.7_20","90.20.7_21","90.20.7_22","90.20.7_23","90.20.7_24","90.20.7_25",
+        "90.20.7_26","90.20.7_27","90.20.7_28","90.20.7_29","90.20.7_30","90.20.7_31","90.20.7_32","90.20.7_33","90.20.7_34","90.20.7_35","90.20.7_36",
+        "90.20.7_37","90.20.7_38","90.20.7_39","90.20.7_40","90.20.7_41","90.20.7_42","90.20.7_43","90.20.7_44","90.20.7_45","90.20.7_46","90.20.7_47",
+        "90.20.7_48","90.20.7_49","90.20.7_50","90.20.7_51","90.20.7_52","90.20.7_53","90.20.7_54","90.20.7_55","90.20.7_56","90.20.7_57","90.20.7_58",
+        "90.20.7_59","90.20.7_60","90.20.7_61","90.20.7_62","90.20.7_63","90.20.7_64","90.20.7_65","90.20.7_66","90.20.7_67","90.20.7_68","90.20.7_69",
+        "90.20.7_70","90.20.7_71","90.20.7_72","90.38.G_2","90.38.G_3","91.24.A_0","91.24.S_1","93.39.4_0","93.39.5_0","93.39.9_0","93.40.2_0","93.40.3_2",
+        "93.40.3_3","93.40.4_0","96.54.1_0","96.54.2_0","97.35_2","97.35_3","99.29.7_0","99.97.1_0","99.97.2_2","99.97.2_3","99.97.2_4","99.97.2_5","99.97.2_6",
+        "99.97.2_7","99.97.2_8","99.99.2_0","99.99.3_0"};
+
+        listaVenetoResidenti.addAll(Arrays.asList(listaCodici));
+        
+        drools.getWorkingMemory().setGlobal("listaVenetoResidenti", listaVenetoResidenti);
+        LOGGER.warn(" inizializing list listaVenetoResidenti "+ listaVenetoResidenti);
+    }else if(LOGGER != null && LOGGER.isInfoEnabled()) {
+        LOGGER.warn("Avoid inizializing list listaVenetoResidenti ");
+    }
+end
+
+rule "050-Densitometry Rule"
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "050")   
+    $p : Procedure($cntCode : cntCode!=null && (cntCode =="88.99.5" || cntCode=="88.99.6" || cntCode=="88.99.7" || cntCode=="88.99.8" || cntCode=="88.99.2") )
+then
+    if(LOGGER != null)
+        LOGGER.info("Densiometria ossea Veneto");
+    
+    boolean ignore = !$p.getCheckFlags().containsKey("densVenWarning") ? false : $p.getCheckFlags().get("densVenWarning");
+    Notification note = new Notification("VN01", "validator.procedure.densVenWarning");  
+    if(ignore) {
+    		$p.getInformations().add(note);
+    	} 
+    else {
+    		$p.getWarnings().add(note);
+    	}
+end
+
+
+
+rule "050 - Non Resident Rule"
+enabled false
+salience -100
+when 
+    $validator : Validator(region == "050" && patientInfo !=null && patientInfo.patientRegion!=null && patientInfo.patientRegion!="050")    
+    $value : String() from listaVenetoResidenti
+    $p: Procedure( $catalogueCode: catalogueCode != null && !catalogueCode.trim().isEmpty() && $value == catalogueCode)
+then 
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Non Resident  Rule " + $validator.getPatientInfo().getPatientRegion());
+    $p.getWarnings().add(new Notification("VN02","validator.procedure.nonResidentAlert"));
+end    

@@ -1,0 +1,84 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+/*
+ * PHT management
+ */
+
+rule "Naz- Care Plan is Active"
+dialect "java"
+when
+	$d: Drug( type == 'F',drugFlags["PHT"] != null && drugFlags["PHT"] == true , $ai : activeIngredient > 0, $availableNotes : availableNotes, $checkFlags :checkFlags )
+	do[setPhtError]
+	// sia $carePlan un piano terapeutico con principio attivo $ai
+    $carePlan : CarePlan( activeIngredient == $ai )
+    do[forceFlagPht]
+    //se farmaco con nota 97
+    if($availableNotes!=null && $availableNotes.size()>0 && $availableNotes.contains("97") )
+         do[setProtocol]
+     
+then
+     if(LOGGER != null)
+        LOGGER.info( "Naz- Care Plan is Active" ); 
+        
+then[setProtocol]  
+    $d.setCarePlanNumber($carePlan.getProtocolNumber());
+    
+then[forceFlagPht]    
+
+    if (!$d.getCheckFlags().containsKey("ForcePHT") )
+        $d.addCheckFlags("ForcePHT", new Boolean(true));
+
+then[setPhtError]
+
+    boolean exsistForce = $d.getCheckFlags().containsKey("ForcePHT");
+	Notification n = new Notification("PHT", "validator.drug.pht");
+	
+	if(exsistForce) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getErrors().add(n);
+    }
+    
+    if(exsistForce) {
+        modify($d) {
+		  setGranted($d.getCheckFlags().get("ForcePHT"))
+		} 
+    }
+end
+
+
+rule "Naz- Care Plan not Active"
+salience 99
+dialect "java"
+when
+    //farmaco con  nota 97 e PHT a si
+	$d: Drug( type == 'F' && note == "97" && checkFlags["ForcePHT"] != null && checkFlags["ForcePHT"] == true && carePlanNumber == null, $ai : activeIngredient > 0)
+	// se non esiste un piano terapeutico con principio attivo $ai
+  //  not CarePlan( activeIngredient == $ai )
+then
+     if(LOGGER != null)
+        LOGGER.info( "Naz- Care Plan not Active" ); 
+    //devo censirlo per inviarlo al MEF
+   // $d.setCarePlanNumber(null);
+    
+    $d.getErrors().add(new Notification("PHT1","validator.drug.missingProtocolNumber"));
+end
+
+
+
+
+
+rule "Naz- PHT and Not granted Rule"
+salience -90
+when 
+  //se non uso la nota granted è  false e metto pht a no
+  $d : Drug ( group == "A" && availableNotes != null && availableNotes.size() > 0 && ( useNote == null ||useNote == false) &&  checkFlags["ForcePHT"] != null && checkFlags["ForcePHT"] == true)
+then
+
+   $d.addCheckFlags("ForcePHT", new Boolean(false));
+   $d.setCarePlanNumber(null);
+
+end
+
+

@@ -1,0 +1,63 @@
+package eu.dedalus.prescriptionvalidator;
+
+
+rule "190-TDL Rule"
+dialect "java"
+when   
+    $validator : Validator(region == "190")
+    $d : Drug( type == 'F' && isGranted()==true && drugFlags["tdl"] != null && drugFlags["tdl"] == true)
+        
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("190-TDL Rule" + $d);
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("TDLAlert") ? false : $d.getCheckFlags().get("TDLAlert");
+    Notification n = new Notification("TDL","validator.drug.TDLAlert");
+     if(ignore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getErrors().add(n);
+    }    
+end
+
+/*Ossigeno liquido-Covid*/
+rule "190-Oxygen dosage mandatory"
+dialect "java"
+when
+    $validator : Validator(region == "190")
+    $d: Drug(  type == 'F' && isGranted() == true && activeIngredient != null,description != null, activeIngredient.intValue() == 279900 &&
+                description.contains("CRIOGEN") && checkFlags["COV"] != null && checkFlags["COV"] == true 
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("190-Oxygen dosage mandatory" + $d);
+    
+    Notification n = new Notification("POSOL","validator.drug.dosageOxyAlert");
+    //dosage mandatory
+    boolean ignoreD = !$d.getCheckFlags().containsKey("dosageAlertIgnore") ? false : $d.getCheckFlags().get("dosageAlertIgnore");
+    if(ignoreD) {
+		$d.getInformations().add(n);
+	} else {
+		$d.getErrors().add(n);
+	} 
+end
+
+rule "190-Oxygen covid Rule"
+dialect "java"
+when   
+    $validator : Validator(region == "190")
+    $d: Drug(  type == 'F' && isGranted() == true && activeIngredient != null,description != null, activeIngredient.intValue() == 279900 &&
+                description.contains("CRIOGEN")
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("190-Oxygen covid Rule" + $d);
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("CovidAlert") ? false : $d.getCheckFlags().get("CovidAlert");
+    Notification n = new Notification("COV","validator.drug.oxyCovidAlert");
+     if(ignore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getErrors().add(n);
+    }    
+end

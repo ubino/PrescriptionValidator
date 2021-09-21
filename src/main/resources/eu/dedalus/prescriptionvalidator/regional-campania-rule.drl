@@ -1,0 +1,126 @@
+package eu.dedalus.prescriptionvalidator;
+import eu.dedalus.prescriptionmodel.Drug;
+import eu.dedalus.prescriptionmodel.Validator;
+
+
+//Demat flag management
+rule "150-IsNOTDemat Rule"
+dialect "java"
+when
+    $validator : Validator(region == "150")
+    $d: Drug( 
+                (drugFlags["SSR"] != null && drugFlags["SSR"] == true) ||
+                (drugFlags["garrison"] != null && drugFlags["garrison"] == true) || //presidio
+                (drugFlags["NoSSN"] != null && drugFlags["NoSSN"] == true) 
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Is a RED prescription " + $d);
+    $d.setDemat(false);
+end
+
+rule "150-antibiotics Rule"
+dialect "java"
+when
+    $validator : Validator(region == "150")
+    $d : Drug( type == 'F', atc != null && atc.startsWith("J01") )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.info("the drug with atc "+ $d.getAtc() +" need to specify a diagnosis ");
+    
+    if($d.getDiagnosis() == null || $d.getDiagnosis().isEmpty()){
+        $d.getErrors().add(new Notification("C02","validator.drug.missingDiagnosis")); 
+    }
+    
+    $d.getCheckFlags().put("mandatoryProblem", true);
+end
+
+
+rule "150- Prescription Reason Rule (Decreto 56)"
+// salience -100 Non dovrebbe servire, chi ne modifica il valore invoca il modify() della drools memory
+when 
+    $validator : Validator(region == "150") 
+    $d: Drug(type == 'F' && isGranted() == true && activeIngredient != null && activeIngredient.intValue() == 900322, $prescReason : prescReason)
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Prescription Reason Rule for " + $d.getDescription()+ " "+$d.isGranted());
+    
+    Notification reason = new Notification("REASON", "validator.drug.missingReason");
+    reason.setChoiceType("SINGLE");
+    reason.addChoice("13","13 - Paziente con trattamento in corso");
+    reason.addChoice("100","Altro");
+    
+    if($prescReason == null || $prescReason.isEmpty()){
+        //need to add reason
+        $d.getErrors().add(reason);
+    } else {
+        if(LOGGER != null)
+            LOGGER.info("Prescription Reason  is already specified ");
+            
+        if($prescReason.equals("100") && ($d.getCheckFlags() == null || $d.getCheckFlags().get("otherPrescReason") == false ) ){
+            //no other reason specified
+            if(LOGGER != null)
+                LOGGER.info("validator.drug.missingOtherReason");
+                
+            reason.setMessage("validator.drug.missingOtherReason");
+            //no other reason specified
+           $d.getErrors().add(reason);
+        } else {
+             // can change reason
+            reason.setMessage("validator.drug.alreadyPrescReason");
+            $d.getInformations().add(reason);
+        }
+    }
+end   
+
+rule "150-PMA NO Demat Rule" //FIXME: va fatto il controllo nel solver? anche se sembra che nn sia multibranca
+enabled false
+dialect "java"
+when
+    $validator : Validator(region == "150")
+    $p : Procedure(  branches != null &&  branches.size() == 1  && branches.contains("98") )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("PMA NO Demat Rule " + $p.getDescription());
+    $p.setDemat(false);
+end
+
+rule "150-Oxygen dosage mandatory"
+dialect "java"
+when
+    $validator : Validator(region == "150")
+    $d: Drug(  type == 'F' && isGranted() == true && activeIngredient != null,description != null, activeIngredient.intValue() == 279900 &&
+                description.contains("CRIOGEN")
+            )
+then
+    Notification n = new Notification("POSOL","validator.drug.dosageOxyAlert");
+    //dosage mandatory
+    boolean ignoreD = !$d.getCheckFlags().containsKey("dosageAlertIgnore") ? false : $d.getCheckFlags().get("dosageAlertIgnore");
+    if(ignoreD) {
+		$d.getInformations().add(n);
+	} else {
+		$d.getErrors().add(n);
+	} 
+end
+
+rule "150-Oxygen covid Rule"
+dialect "java"
+when   
+    $validator : Validator(region == "150")
+    $d: Drug(  type == 'F' && isGranted() == true && activeIngredient != null,description != null, activeIngredient.intValue() == 279900 &&
+                description.contains("CRIOGEN")
+            )
+then
+    if(LOGGER != null && LOGGER.isInfoEnabled())
+        LOGGER.debug("Oxygen covid Rule" + $d);
+    
+    boolean ignore = !$d.getCheckFlags().containsKey("CovidAlert") ? false : $d.getCheckFlags().get("CovidAlert");
+    Notification n = new Notification("COV","validator.drug.oxyCovidAlert");
+     if(ignore) {
+        $d.getInformations().add(n);
+    } else {
+        $d.getErrors().add(n);
+    }    
+end
+
+
